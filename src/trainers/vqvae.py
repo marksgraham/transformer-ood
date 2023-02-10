@@ -118,10 +118,16 @@ class VQVAETrainer:
         # wrap the model with DistributedDataParallel module
         if self.ddp:
             self.model = DistributedDataParallel(
-                self.model, device_ids=[self.device], find_unused_parameters=False
+                self.model,
+                device_ids=[self.device],
+                find_unused_parameters=False,
+                broadcast_buffers=False,
             )
             self.discriminator = DistributedDataParallel(
-                self.discriminator, device_ids=[self.device], find_unused_parameters=False
+                self.discriminator,
+                device_ids=[self.device],
+                find_unused_parameters=False,
+                broadcast_buffers=False,
             )
 
         if args.quick_test:
