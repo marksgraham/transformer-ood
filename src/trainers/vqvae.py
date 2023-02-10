@@ -264,6 +264,19 @@ class VQVAETrainer:
                 tag="l1_loss", scalar_value=recons_loss.item(), global_step=self.global_step
             )
             self.logger_train.add_scalar(
+                tag="perceptual_loss",
+                scalar_value=perceptual_loss.item(),
+                global_step=self.global_step,
+            )
+            self.logger_train.add_scalar(
+                tag="jukebox_loss", scalar_value=jukebox_loss.item(), global_step=self.global_step
+            )
+            self.logger_train.add_scalar(
+                tag="adversarial_loss",
+                scalar_value=adversarial_loss.item(),
+                global_step=self.global_step,
+            )
+            self.logger_train.add_scalar(
                 tag="generator_loss",
                 scalar_value=total_generator_loss.item(),
                 global_step=self.global_step,
@@ -288,11 +301,8 @@ class VQVAETrainer:
                 leave=True,
                 desc="Validation",
             )
-            epoch_loss = 0
-            gen_epoch_loss = 0
-            disc_epoch_loss = 0
+
             global_val_step = self.global_step
-            val_steps = 0
             for step, batch in progress_bar:
                 images = batch["image"].to(self.device)
                 reconstruction, quantization_loss = self.model(images=images)
@@ -325,10 +335,8 @@ class VQVAETrainer:
                 # )
                 global_val_step += images.shape[0]
 
+                # plot some recons
                 if step == 0:
-                    # plot some recons
-
-                    print("debug")
                     fig = plt.figure()
                     for i in range(2):
                         plt.subplot(2, 2, i * 2 + 1)
