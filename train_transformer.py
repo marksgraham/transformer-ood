@@ -47,7 +47,7 @@ def parse_args():
     return args
 
 
-# to run using DDP, run torchrun --nproc_per_node=1 --nnodes=1 --node_rank=0  train_vqvae.py --args
+# to run using DDP, run torchrun --nproc_per_node=1 --nnodes=1 --node_rank=0  train_transformer.py --args
 if __name__ == "__main__":
     args = parse_args()
     trainer = TransformerTrainer(args)

@@ -133,12 +133,6 @@ class TransformerTrainer:
         # wrap the model with DistributedDataParallel module
         if self.ddp:
             self.model = DistributedDataParallel(
-                self.vqvae_model,
-                device_ids=[self.device],
-                find_unused_parameters=False,
-                broadcast_buffers=False,
-            )
-            self.model = DistributedDataParallel(
                 self.model,
                 device_ids=[self.device],
                 find_unused_parameters=False,
@@ -303,7 +297,9 @@ class TransformerTrainer:
                         * torch.ones(1, 1).to(self.device),
                         latent_spatial_dim=latent_spatial_dim,
                         vqvae_model=self.vqvae_model,
-                        transformer_model=self.model,
+                        transformer_model=self.model.module
+                        if dist.is_initialized()
+                        else self.model,
                         ordering=self.ordering,
                         verbose=False,
                     )
