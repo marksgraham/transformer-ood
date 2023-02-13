@@ -1,6 +1,6 @@
 import argparse
 
-from src.trainers.vqvae import VQVAETrainer
+from src.trainers import TransformerTrainer
 
 
 def parse_args():
@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("--validation_dir", help="Location of folder with validation niis.")
 
     # model params
+    parser.add_argument("--vqvae_checkpoint", help="Path to a VQ-VAE model checkpoint.")
 
     # training param
     parser.add_argument("--batch_size", type=int, default=4, help="Training batch size.")
@@ -46,8 +47,8 @@ def parse_args():
     return args
 
 
-# to run using DDP, run torchrun --nproc_per_node=1 --nnodes=1 --node_rank=0  train.py --args
+# to run using DDP, run torchrun --nproc_per_node=1 --nnodes=1 --node_rank=0  train_vqvae.py --args
 if __name__ == "__main__":
     args = parse_args()
-    trainer = VQVAETrainer(args)
+    trainer = TransformerTrainer(args)
     trainer.train(args)
