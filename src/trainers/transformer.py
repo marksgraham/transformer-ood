@@ -92,7 +92,7 @@ class TransformerTrainer:
         self.model = DecoderOnlyTransformer(
             num_tokens=256 + 1,
             max_seq_len=math.prod(latent_spatial_shape) + 1,
-            attn_layers_dim=4,
+            attn_layers_dim=256,
             attn_layers_depth=22,
             attn_layers_heads=8,
             with_cross_attention=False,
