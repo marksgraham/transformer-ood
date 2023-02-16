@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import torch.distributed as dist
-import torch.nn.functional as F
 from generative.inferers import VQVAETransformerInferer
 from generative.networks.nets import VQVAE, DecoderOnlyTransformer
 from generative.utils.enums import OrderingType
@@ -53,7 +53,6 @@ class TransformerTrainer:
             in_channels=1,
             out_channels=1,
             num_res_layers=3,
-            num_levels=4,
             downsample_parameters=((2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1)),
             upsample_parameters=(
                 (2, 4, 1, 1, 0),
@@ -71,7 +70,11 @@ class TransformerTrainer:
         vqvae_checkpoint_path = Path(args.vqvae_checkpoint)
         if vqvae_checkpoint_path.exists():
             vqvae_checkpoint = torch.load(vqvae_checkpoint_path)
-            self.vqvae_model.load_state_dict(vqvae_checkpoint["model_state_dict"])
+            model_state_dict = vqvae_checkpoint["model_state_dict"]
+            new_model_state_dict = {
+                k.replace("coder.", "coder.blocks."): v for k, v in model_state_dict.items()
+            }
+            self.vqvae_model.load_state_dict(new_model_state_dict)
         else:
             raise FileNotFoundError(f"Cannot find VQ-VAE checkpoint {args.vqvae_checkpoint}")
         print(
@@ -212,20 +215,13 @@ class TransformerTrainer:
         for step, batch in progress_bar:
             images = batch["image"].to(self.device)
             self.optimizer.zero_grad(set_to_none=True)
-            prediction = self.inferer(
+            prediction, latent, latent_size = self.inferer(
                 inputs=images,
                 vqvae_model=self.vqvae_model,
                 transformer_model=self.model,
                 ordering=self.ordering,
+                return_latent=True,
             )
-
-            # get the ground truth
-            with torch.no_grad():
-                latent = self.vqvae_model.index_quantize(images)
-            latent = latent.reshape(latent.shape[0], -1)
-            latent = latent[:, self.ordering.get_sequence_ordering()]
-            latent = F.pad(latent, (1, 0), "constant", self.vqvae_model.num_embeddings)
-            latent = latent.long()
 
             loss = ce_loss(prediction.transpose(1, 2), latent)
 
@@ -265,21 +261,13 @@ class TransformerTrainer:
 
             for step, batch in progress_bar:
                 images = batch["image"].to(self.device)
-                prediction = self.inferer(
+                prediction, latent, latent_spatial_dim = self.inferer(
                     inputs=images,
                     vqvae_model=self.vqvae_model,
                     transformer_model=self.model,
                     ordering=self.ordering,
+                    return_latent=True,
                 )
-
-                # get the ground truth
-                with torch.no_grad():
-                    latent = self.vqvae_model.index_quantize(images)
-                    latent_spatial_dim = tuple(latent.shape[1:])
-                latent = latent.reshape(latent.shape[0], -1)
-                latent = latent[:, self.ordering.get_sequence_ordering()]
-                latent = F.pad(latent, (1, 0), "constant", self.vqvae_model.num_embeddings)
-                latent = latent.long()
 
                 loss = ce_loss(prediction.transpose(1, 2), latent)
 
@@ -290,7 +278,6 @@ class TransformerTrainer:
                 global_val_step += images.shape[0]
 
                 # generate a sample
-
                 if step == 0:
                     sample = self.inferer.sample(
                         starting_tokens=self.vqvae_model.num_embeddings
@@ -312,3 +299,56 @@ class TransformerTrainer:
                     self.logger_val.add_figure(
                         tag="samples", figure=fig, global_step=self.global_step
                     )
+
+    @torch.no_grad()
+    def ood(self, args):
+        results_list = []
+        self.vqvae_model.eval()
+        self.model.eval()
+        for ood_dir in args.ood_dir.split(","):
+            ood_loader = get_training_data_loader(
+                batch_size=args.batch_size,
+                training_ids=ood_dir,
+                validation_ids=ood_dir,
+                num_workers=args.num_workers,
+                cache_data=False,
+                only_val=True,
+            )
+            progress_bar = tqdm(
+                enumerate(ood_loader),
+                total=len(ood_loader),
+                ncols=110,
+                position=0,
+                leave=True,
+                desc="Validation",
+            )
+            # batch = first(self.val_loader)
+            # images = batch['image'].to(self.device)
+            for step, batch in progress_bar:
+                images = batch["image"].to(self.device)
+                likelihoods = self.inferer.get_likelihood(
+                    images,
+                    vqvae_model=self.vqvae_model,
+                    transformer_model=self.model,
+                    ordering=self.ordering,
+                    resample_latent_likelihoods=False,
+                    resample_interpolation_mode="nearest",
+                )
+
+                for b in range(images.shape[0]):
+                    stem = Path(batch["image_meta_dict"]["filename_or_obj"][b]).stem.replace(
+                        ".nii", ""
+                    )
+                    likelihood = likelihoods[b, ...].sum().item()
+                    results_list.append({"filename": stem, "likelihood": likelihood})
+                    # print(f'\n{stem}:{likelihood}')
+                    # slices = [50, 100, 150]
+                    # for i in range(len(slices)):
+                    #     plt.subplot(2, len(slices), i + 1)
+                    #     plt.imshow(images[b, 0, :, :, slices[i]].cpu(),vmin=0 ,vmax=1, cmap="gray")
+                    #     plt.subplot(2, len(slices), i + 4)
+                    #     plt.imshow(likelihood[b, 0, :, :, slices[i]].cpu(),vmin=-2,vmax=0)
+                    #     plt.suptitle(stem)
+                    # plt.show()
+        results_df = pd.DataFrame(results_list)
+        results_df.to_csv(self.run_dir / "results.csv")
