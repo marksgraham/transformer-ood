@@ -302,6 +302,11 @@ class TransformerTrainer:
 
     @torch.no_grad()
     def ood(self, args):
+        if args.transformer_checkpoint:
+            print(f"Using checkpoint {args.transformer_checkpoint}")
+            checkpoint = torch.load(args.transformer_checkpoint)
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+
         results_list = []
         self.vqvae_model.eval()
         self.model.eval()
@@ -331,7 +336,7 @@ class TransformerTrainer:
                     vqvae_model=self.vqvae_model,
                     transformer_model=self.model,
                     ordering=self.ordering,
-                    resample_latent_likelihoods=False,
+                    resample_latent_likelihoods=True,
                     resample_interpolation_mode="nearest",
                 )
 
@@ -341,14 +346,19 @@ class TransformerTrainer:
                     )
                     likelihood = likelihoods[b, ...].sum().item()
                     results_list.append({"filename": stem, "likelihood": likelihood})
-                    # print(f'\n{stem}:{likelihood}')
-                    # slices = [50, 100, 150]
-                    # for i in range(len(slices)):
-                    #     plt.subplot(2, len(slices), i + 1)
-                    #     plt.imshow(images[b, 0, :, :, slices[i]].cpu(),vmin=0 ,vmax=1, cmap="gray")
-                    #     plt.subplot(2, len(slices), i + 4)
-                    #     plt.imshow(likelihood[b, 0, :, :, slices[i]].cpu(),vmin=-2,vmax=0)
-                    #     plt.suptitle(stem)
-                    # plt.show()
+                    print(f"\n{stem}: {likelihood}")
+                    slices = [50, 100, 150]
+                    for i in range(len(slices)):
+                        plt.subplot(2, len(slices), i + 1)
+                        plt.imshow(images[b, 0, :, slices[i], :].cpu(), vmin=0, vmax=1, cmap="gray")
+                        plt.subplot(2, len(slices), i + 4)
+                        # plt.imshow(likelihoods[b, 0, :,  slices[i], :].cpu(),vmin=-2,vmax=0)
+
+                        plt.imshow(
+                            torch.exp(likelihoods[b, 0, :, slices[i], :].cpu()), vmin=0, vmax=0.8
+                        )
+
+                        plt.suptitle(f"\n{stem}: {likelihood}")
+                    plt.show()
         results_df = pd.DataFrame(results_list)
         results_df.to_csv(self.run_dir / "results.csv")

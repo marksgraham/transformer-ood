@@ -16,6 +16,7 @@ def parse_args():
 
     # model params
     parser.add_argument("--vqvae_checkpoint", help="Path to a VQ-VAE model checkpoint.")
+    parser.add_argument("--transformer_checkpoint", help="Path to a VQ-VAE model checkpoint.")
 
     # training param
     parser.add_argument("--batch_size", type=int, default=4, help="Training batch size.")
