@@ -63,7 +63,7 @@ class TransformerTrainer:
             num_channels=[128, 128, 128, 256],
             num_res_channels=[128, 128, 128, 256],
             num_embeddings=256,
-            embedding_dim=32,
+            embedding_dim=256,
         )
         self.vqvae_model.to(self.device)
         # load checkpoint

@@ -52,7 +52,6 @@ class VQVAETrainer:
             in_channels=1,
             out_channels=1,
             num_res_layers=3,
-            num_levels=4,
             downsample_parameters=((2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1)),
             upsample_parameters=(
                 (2, 4, 1, 1, 0),
@@ -63,7 +62,7 @@ class VQVAETrainer:
             num_channels=[128, 128, 128, 256],
             num_res_channels=[128, 128, 128, 256],
             num_embeddings=256,
-            embedding_dim=32,
+            embedding_dim=256,
         )
         self.model.to(self.device)
         print(f"{sum(p.numel() for p in self.model.parameters()):,} model parameters")
