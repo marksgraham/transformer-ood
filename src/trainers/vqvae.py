@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from pathlib import Path
@@ -46,24 +47,20 @@ class VQVAETrainer:
             print(f"  {k}: {v}")
 
         # set up model
-
-        self.model = VQVAE(
-            spatial_dims=3,
-            in_channels=1,
-            out_channels=1,
-            num_res_layers=3,
-            downsample_parameters=((2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1)),
-            upsample_parameters=(
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-            ),
-            num_channels=[128, 128, 128, 256],
-            num_res_channels=[128, 128, 128, 256],
-            num_embeddings=256,
-            embedding_dim=256,
-        )
+        vqvae_args = {
+            "spatial_dims": args.spatial_dimension,
+            "in_channels": args.vqvae_in_channels,
+            "out_channels": args.vqvae_out_channels,
+            "num_res_layers": args.vqvae_num_res_layers,
+            "downsample_parameters": args.vqvae_downsample_parameters,
+            "upsample_parameters": args.vqvae_upsample_parameters,
+            "num_channels": args.vqvae_num_channels,
+            "num_res_channels": args.vqvae_num_res_channels,
+            "num_embeddings": args.vqvae_num_embeddings,
+            "embedding_dim": args.vqvae_embedding_dim,
+            "decay": args.vqvae_decay,
+        }
+        self.model = VQVAE(**vqvae_args)
         self.model.to(self.device)
         print(f"{sum(p.numel() for p in self.model.parameters()):,} model parameters")
 
@@ -109,6 +106,11 @@ class VQVAETrainer:
             self.start_epoch = 0
             self.best_loss = 1000
             self.global_step = 0
+
+        # save vqvae parameters
+        self.run_dir.mkdir(exist_ok=True)
+        with open(self.run_dir / "vqvae_config.json", "w") as f:
+            json.dump(vqvae_args, f, indent=4)
 
         self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr=2.5e-5)
         if checkpoint_path.exists():

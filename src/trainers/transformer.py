@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import sys
@@ -48,35 +49,27 @@ class TransformerTrainer:
             print(f"  {k}: {v}")
 
         # set up VQ-VAE
-        self.vqvae_model = VQVAE(
-            spatial_dims=3,
-            in_channels=1,
-            out_channels=1,
-            num_res_layers=3,
-            downsample_parameters=((2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1)),
-            upsample_parameters=(
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-                (2, 4, 1, 1, 0),
-            ),
-            num_channels=[128, 128, 128, 256],
-            num_res_channels=[128, 128, 128, 256],
-            num_embeddings=256,
-            embedding_dim=256,
-        )
-        self.vqvae_model.to(self.device)
-        # load checkpoint
         vqvae_checkpoint_path = Path(args.vqvae_checkpoint)
-        if vqvae_checkpoint_path.exists():
-            vqvae_checkpoint = torch.load(vqvae_checkpoint_path)
-            model_state_dict = vqvae_checkpoint["model_state_dict"]
-            new_model_state_dict = {
-                k.replace("coder.", "coder.blocks."): v for k, v in model_state_dict.items()
-            }
-            self.vqvae_model.load_state_dict(new_model_state_dict)
-        else:
-            raise FileNotFoundError(f"Cannot find VQ-VAE checkpoint {args.vqvae_checkpoint}")
+        vqvae_config_path = vqvae_checkpoint_path.parent / "vqvae_config.json"
+        if not vqvae_checkpoint_path.exists():
+            raise FileNotFoundError(f"Cannot find VQ-VAE checkpoint {vqvae_checkpoint_path}")
+        if not vqvae_config_path.exists():
+            raise FileNotFoundError(f"Cannot find VQ-VAE config {vqvae_config_path}")
+        with open(vqvae_config_path, "r") as f:
+            self.vqvae_config = json.load(f)
+        self.vqvae_model = VQVAE(**self.vqvae_config)
+        vqvae_checkpoint = torch.load(vqvae_checkpoint_path)
+        model_state_dict = vqvae_checkpoint["model_state_dict"]
+        # mantain compatibility when weight names changed in monai-generative
+        # new_model_state_dict = {
+        #     k.replace("coder.", "coder.blocks."): v for k, v in model_state_dict.items()
+        # }
+        self.vqvae_model.load_state_dict(model_state_dict)
+        self.vqvae_model.to(self.device)
+        self.vqvae_model.eval()
+        print("Loaded vqvae model with config:")
+        for k, v in self.vqvae_config.items():
+            print(f"  {k}: {v}")
         print(
             f"VQ-VAE with {sum(p.numel() for p in self.vqvae_model.parameters()):,} model parameters"
         )
@@ -93,7 +86,7 @@ class TransformerTrainer:
         latent_spatial_shape = tuple(latent_sample.shape[1:])
         # set up transformer
         self.model = DecoderOnlyTransformer(
-            num_tokens=256 + 1,
+            num_tokens=self.vqvae_config["num_embeddings"] + 1,
             max_seq_len=math.prod(latent_spatial_shape) + 1,
             attn_layers_dim=256,
             attn_layers_depth=22,

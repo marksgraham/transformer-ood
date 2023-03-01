@@ -1,4 +1,5 @@
 import argparse
+import ast
 
 from src.trainers import VQVAETrainer
 
@@ -12,6 +13,26 @@ def parse_args():
     parser.add_argument("--validation_dir", help="Location of folder with validation niis.")
 
     # model params
+    parser.add_argument("--vqvae_in_channels", default=1, type=int)
+    parser.add_argument("--vqvae_out_channels", default=1, type=int)
+    parser.add_argument("--vqvae_num_res_layers", default=3, type=int)
+    parser.add_argument(
+        "--vqvae_downsample_parameters",
+        default=((2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1), (2, 4, 1, 1)),
+        type=ast.literal_eval,
+    )
+    parser.add_argument(
+        "--vqvae_upsample_parameters",
+        default=((2, 4, 1, 1, 0), (2, 4, 1, 1, 0), (2, 4, 1, 1, 0), (2, 4, 1, 1, 0)),
+        type=ast.literal_eval,
+    )
+    parser.add_argument("--vqvae_num_channels", default=[128, 128, 128, 256], type=ast.literal_eval)
+    parser.add_argument(
+        "--vqvae_num_res_channels", default=[128, 128, 128, 256], type=ast.literal_eval
+    )
+    parser.add_argument("--vqvae_num_embeddings", default=256, type=int)
+    parser.add_argument("--vqvae_embedding_dim", default=256, type=int)
+    parser.add_argument("--vqvae_decay", default=0.99, type=float)
 
     # training param
     parser.add_argument("--batch_size", type=int, default=4, help="Training batch size.")
