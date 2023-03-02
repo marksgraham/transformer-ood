@@ -85,15 +85,48 @@ class TransformerTrainer:
         latent_sample = self.vqvae_model.index_quantize(data_sample["image"].to(self.device))
         latent_spatial_shape = tuple(latent_sample.shape[1:])
         # set up transformer
-        self.model = DecoderOnlyTransformer(
-            num_tokens=self.vqvae_config["num_embeddings"] + 1,
-            max_seq_len=math.prod(latent_spatial_shape) + 1,
-            attn_layers_dim=256,
-            attn_layers_depth=22,
-            attn_layers_heads=8,
-            with_cross_attention=False,
-        )
+        if args.transformer_type == "transformer":
+            self.model = DecoderOnlyTransformer(
+                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                max_seq_len=int(args.transformer_max_seq_length)
+                if args.transformer_max_seq_length
+                else math.prod(latent_spatial_shape) + 1,
+                attn_layers_dim=256,
+                attn_layers_depth=22,
+                attn_layers_heads=8,
+                with_cross_attention=False,
+            )
+        elif args.transformer_type == "performer":
+            from performer_pytorch import PerformerLM
+
+            self.model = PerformerLM(
+                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                max_seq_len=int(args.transformer_max_seq_length)
+                if args.transformer_max_seq_length
+                else math.prod(latent_spatial_shape) + 1,
+                dim=256,
+                depth=22,
+                heads=8,
+                causal=True,
+            )
+        elif args.transformer_type == "memory-efficient":
+            from src.networks.memory_efficient_transformer import (
+                MemoryEfficientTransformer,
+            )
+
+            self.model = MemoryEfficientTransformer(
+                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                max_seq_len=int(args.transformer_max_seq_length)
+                if args.transformer_max_seq_length
+                else math.prod(latent_spatial_shape) + 1,
+                attn_layers_dim=256,
+                attn_layers_depth=22,
+                attn_layers_heads=8,
+            )
+        else:
+            raise ValueError(f"Unrecognised transformer_type {args.transformer_type}")
         self.model.to(self.device)
+
         self.inferer = VQVAETransformerInferer()
         print(
             f"Transformer with {sum(p.numel() for p in self.model.parameters()):,} model parameters"
@@ -331,6 +364,7 @@ class TransformerTrainer:
                     ordering=self.ordering,
                     resample_latent_likelihoods=True,
                     resample_interpolation_mode="nearest",
+                    verbose=True,
                 )
 
                 for b in range(images.shape[0]):
@@ -340,18 +374,18 @@ class TransformerTrainer:
                     likelihood = likelihoods[b, ...].sum().item()
                     results_list.append({"filename": stem, "likelihood": likelihood})
                     print(f"\n{stem}: {likelihood}")
-                    slices = [50, 100, 150]
-                    for i in range(len(slices)):
-                        plt.subplot(2, len(slices), i + 1)
-                        plt.imshow(images[b, 0, :, slices[i], :].cpu(), vmin=0, vmax=1, cmap="gray")
-                        plt.subplot(2, len(slices), i + 4)
-                        # plt.imshow(likelihoods[b, 0, :,  slices[i], :].cpu(),vmin=-2,vmax=0)
-
-                        plt.imshow(
-                            torch.exp(likelihoods[b, 0, :, slices[i], :].cpu()), vmin=0, vmax=0.8
-                        )
-
-                        plt.suptitle(f"\n{stem}: {likelihood}")
+                    # slices = [50, 100, 150]
+                    # for i in range(len(slices)):
+                    #     plt.subplot(2, len(slices), i + 1)
+                    #     plt.imshow(images[b, 0, :, slices[i], :].cpu(), vmin=0, vmax=1, cmap="gray")
+                    #     plt.subplot(2, len(slices), i + 4)
+                    #     # plt.imshow(likelihoods[b, 0, :,  slices[i], :].cpu(),vmin=-2,vmax=0)
+                    #
+                    #     plt.imshow(
+                    #         torch.exp(likelihoods[b, 0, :, slices[i], :].cpu()), vmin=0, vmax=0.8
+                    #     )
+                    #
+                    #     plt.suptitle(f"\n{stem}: {likelihood}")
                     plt.show()
         results_df = pd.DataFrame(results_list)
         results_df.to_csv(self.run_dir / "results.csv")

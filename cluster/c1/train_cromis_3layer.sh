@@ -1,5 +1,5 @@
 # transformer
-ngc batch run --name "transformer_cromis_4layer" --priority HIGH --preempt RUNONCE --min-timeslice 259200s --total-runtime 259200s --ace kcl-cbg1-ace \
+ngc batch run --name "transformer_cromis_3layer" --priority HIGH --preempt RUNONCE --min-timeslice 259200s --total-runtime 259200s --ace kcl-cbg1-ace \
 --instance dgxa100.80g.8.norm \
 --commandline "torchrun \
 --nproc_per_node=8 \
@@ -7,8 +7,8 @@ ngc batch run --name "transformer_cromis_4layer" --priority HIGH --preempt RUNON
 --node_rank=0 \
 /mount/transformer-ood/train_transformer.py  \
 --output_dir=/mount/output/  \
---model_name=efficient-transformer_cromis_4layer_64_1024  \
---vqvae_checkpoint=/mount/output/vqvae_cromis_4layer_64_1024/checkpoint.pth \
+--model_name=efficient-transformer_cromis_3layer_64  \
+--vqvae_checkpoint=/mount/output/vqvae_cromis_3layer_64/checkpoint.pth \
 --training_dir=/mount/data/cromis/train \
 --validation_dir=/mount/data/cromis/val \
 --n_epochs=700 \

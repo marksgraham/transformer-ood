@@ -17,6 +17,16 @@ def parse_args():
     # model params
     parser.add_argument("--vqvae_checkpoint", help="Path to a VQ-VAE model checkpoint.")
     parser.add_argument("--transformer_checkpoint", help="Path to a VQ-VAE model checkpoint.")
+    parser.add_argument(
+        "--transformer_type",
+        default="transformer",
+        help="transformer or performer or memory-efficient",
+    )
+    parser.add_argument(
+        "--transformer_max_seq_length",
+        default=None,
+        help="Maximum sequence length for transformer.",
+    )
 
     # training param
     parser.add_argument("--batch_size", type=int, default=4, help="Training batch size.")

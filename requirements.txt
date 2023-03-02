@@ -14,3 +14,5 @@ scikit-learn
 seaborn
 scikit-image
 x-transformers==1.8.1
+performer-pytorch==1.1.4
+git+https://github.com/marksgraham/memory-efficient-attention-pytorch
