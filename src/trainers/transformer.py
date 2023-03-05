@@ -21,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.data.get_train_and_val_data import get_training_data_loader
+from src.networks import MemoryEfficientTransformer, PassthroughVQVAE
 
 
 class TransformerTrainer:
@@ -48,46 +49,52 @@ class TransformerTrainer:
         for k, v in vars(args).items():
             print(f"  {k}: {v}")
 
-        # set up VQ-VAE
-        vqvae_checkpoint_path = Path(args.vqvae_checkpoint)
-        vqvae_config_path = vqvae_checkpoint_path.parent / "vqvae_config.json"
-        if not vqvae_checkpoint_path.exists():
-            raise FileNotFoundError(f"Cannot find VQ-VAE checkpoint {vqvae_checkpoint_path}")
-        if not vqvae_config_path.exists():
-            raise FileNotFoundError(f"Cannot find VQ-VAE config {vqvae_config_path}")
-        with open(vqvae_config_path, "r") as f:
-            self.vqvae_config = json.load(f)
-        self.vqvae_model = VQVAE(**self.vqvae_config)
-        vqvae_checkpoint = torch.load(vqvae_checkpoint_path)
-        model_state_dict = vqvae_checkpoint["model_state_dict"]
-        # mantain compatibility when weight names changed in monai-generative
-        # new_model_state_dict = {
-        #     k.replace("coder.", "coder.blocks."): v for k, v in model_state_dict.items()
-        # }
-        self.vqvae_model.load_state_dict(model_state_dict)
-        self.vqvae_model.to(self.device)
-        self.vqvae_model.eval()
-        print("Loaded vqvae model with config:")
-        for k, v in self.vqvae_config.items():
-            print(f"  {k}: {v}")
-        print(
-            f"VQ-VAE with {sum(p.numel() for p in self.vqvae_model.parameters()):,} model parameters"
-        )
-
+        # set up data loading and draw a sample
+        self.spatial_dimension = args.spatial_dimension
         self.train_loader, self.val_loader = get_training_data_loader(
             batch_size=args.batch_size,
             training_ids=args.training_dir,
             validation_ids=args.validation_dir,
             num_workers=args.num_workers,
             cache_data=bool(args.cache_data),
+            spatial_dimension=self.spatial_dimension,
         )
         data_sample = first(self.train_loader)
+
+        # set up VQ-VAE
+        if args.vqvae_checkpoint:
+            vqvae_checkpoint_path = Path(args.vqvae_checkpoint)
+            vqvae_config_path = vqvae_checkpoint_path.parent / "vqvae_config.json"
+            if not vqvae_checkpoint_path.exists():
+                raise FileNotFoundError(f"Cannot find VQ-VAE checkpoint {vqvae_checkpoint_path}")
+            if not vqvae_config_path.exists():
+                raise FileNotFoundError(f"Cannot find VQ-VAE config {vqvae_config_path}")
+            with open(vqvae_config_path, "r") as f:
+                self.vqvae_config = json.load(f)
+            self.vqvae_model = VQVAE(**self.vqvae_config)
+            vqvae_checkpoint = torch.load(vqvae_checkpoint_path)
+            model_state_dict = vqvae_checkpoint["model_state_dict"]
+
+            self.vqvae_model.load_state_dict(model_state_dict)
+            self.vqvae_model.to(self.device)
+            self.vqvae_model.eval()
+            print("Loaded vqvae model with config:")
+            for k, v in self.vqvae_config.items():
+                print(f"  {k}: {v}")
+            print(
+                f"VQ-VAE with {sum(p.numel() for p in self.vqvae_model.parameters()):,} model parameters"
+            )
+        else:
+            print("No VQ-VAE supplied, training in pixel space.")
+            self.vqvae_model = PassthroughVQVAE()
+            self.vqvae_model.num_embeddings = 256
+
         latent_sample = self.vqvae_model.index_quantize(data_sample["image"].to(self.device))
         latent_spatial_shape = tuple(latent_sample.shape[1:])
         # set up transformer
         if args.transformer_type == "transformer":
             self.model = DecoderOnlyTransformer(
-                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
                 else math.prod(latent_spatial_shape) + 1,
@@ -100,7 +107,7 @@ class TransformerTrainer:
             from performer_pytorch import PerformerLM
 
             self.model = PerformerLM(
-                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
                 else math.prod(latent_spatial_shape) + 1,
@@ -110,12 +117,9 @@ class TransformerTrainer:
                 causal=True,
             )
         elif args.transformer_type == "memory-efficient":
-            from src.networks.memory_efficient_transformer import (
-                MemoryEfficientTransformer,
-            )
 
             self.model = MemoryEfficientTransformer(
-                num_tokens=self.vqvae_config["num_embeddings"] + 1,
+                num_tokens=self.vqvae_model.num_embeddings,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
                 else math.prod(latent_spatial_shape) + 1,
@@ -134,7 +138,7 @@ class TransformerTrainer:
 
         self.ordering = Ordering(
             ordering_type=OrderingType.RASTER_SCAN.value,
-            spatial_dims=3,
+            spatial_dims=self.spatial_dimension,
             dimensions=(1,) + latent_spatial_shape,
         )
 

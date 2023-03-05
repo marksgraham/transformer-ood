@@ -8,11 +8,20 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=2, help="Random seed to use.")
     parser.add_argument("--output_dir", help="Location for models.")
     parser.add_argument("--model_name", help="Name of model.")
-    parser.add_argument("--training_dir", help="Location of folder with training niis.")
-    parser.add_argument("--validation_dir", help="Location of folder with validation niis.")
+    parser.add_argument(
+        "--training_dir",
+        help="Location of folder with training niis or path to a .csv with their locations.",
+    )
+    parser.add_argument(
+        "--validation_dir",
+        help="Location of folder with validation niis or path to a .csv with their locations..",
+    )
 
     # model params
     parser.add_argument("--vqvae_checkpoint", help="Path to a VQ-VAE model checkpoint.")
+    parser.add_argument(
+        "--spatial_dimension", default=3, type=int, help="Dimension of images: 2d or 3d."
+    )
     parser.add_argument(
         "--transformer_type",
         default="transformer",

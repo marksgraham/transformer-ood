@@ -1,13 +1,22 @@
 from pathlib import Path
 
+import pandas as pd
+import torch
 import torch.distributed as dist
 from monai import transforms
 from monai.data import CacheDataset, Dataset, ThreadDataLoader, partition_dataset
 
 
 def get_data_dicts(ids_path: str, shuffle: bool = False):
-    train_data_list = list(Path(ids_path).glob("*.nii*"))
-    data_dicts = [{"image": d} for d in train_data_list]
+    if Path(ids_path).is_dir():
+        train_data_list = list(Path(ids_path).glob("*.nii*"))
+        data_dicts = [{"image": d} for d in train_data_list]
+    else:
+        df = pd.read_csv(ids_path, sep=",")
+        df = list(df)
+        data_dicts = []
+        for row in df:
+            data_dicts.append({"image": row})
     if shuffle:
         data_dicts = shuffle(data_dicts)
 
@@ -37,6 +46,7 @@ def get_training_data_loader(
     num_workers: int = 8,
     num_val_workers: int = 3,
     cache_data=True,
+    spatial_dimension=3,
     first_n=None,
     is_grayscale=False,
     add_vflip=False,
@@ -45,18 +55,25 @@ def get_training_data_loader(
     train_transforms = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]),
-            transforms.ScaleIntensityd(keys=["image"]),
-            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176]),
+            transforms.AddChanneld(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
+            if spatial_dimension == 3
+            else lambda x: x,
+            transforms.ToTensorD(keys=["image"], dtype=torch.long)
+            if spatial_dimension == 2
+            else lambda x: x,
         ]
     )
 
     val_transforms = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]),
-            transforms.ScaleIntensityd(keys=["image"]),
-            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176]),
+            transforms.AddChanneld(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
+            if spatial_dimension == 3
+            else lambda x: x,
         ]
     )
 
