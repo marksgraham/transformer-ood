@@ -27,3 +27,6 @@ class PassthroughVQVAE(torch.nn.Module):
 
     def index_quantize(self, x: torch.Tensor) -> torch.Tensor:
         return x
+
+    def decode_samples(self, x: torch.Tensor) -> torch.Tensor:
+        return x

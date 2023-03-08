@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-import torch
 import torch.distributed as dist
 from monai import transforms
 from monai.data import CacheDataset, Dataset, ThreadDataLoader, partition_dataset
@@ -41,39 +40,42 @@ def get_training_data_loader(
     training_ids: str,
     validation_ids: str,
     only_val: bool = False,
-    augmentation: bool = True,
     drop_last: bool = False,
     num_workers: int = 8,
     num_val_workers: int = 3,
     cache_data=True,
     spatial_dimension=3,
-    first_n=None,
-    is_grayscale=False,
-    add_vflip=False,
-    add_hflip=False,
+    image_size=None,
+    pixel_space=False,
 ):
+    resize_transform = (
+        transforms.ResizeD(keys=["image"], spatial_size=(image_size,) * spatial_dimension)
+        if image_size
+        else lambda x: x
+    )
     train_transforms = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.AddChanneld(keys=["image"]),
+            resize_transform,
             transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
             transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
             if spatial_dimension == 3
             else lambda x: x,
-            transforms.ToTensorD(keys=["image"], dtype=torch.long)
-            if spatial_dimension == 2
-            else lambda x: x,
+            transforms.SqueezeDimD(keys=["image"], dim=0) if pixel_space else lambda x: x,
         ]
     )
 
     val_transforms = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
+            transforms.AddChanneld(keys=["image"]),
+            resize_transform,
             transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
             transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
             if spatial_dimension == 3
             else lambda x: x,
+            transforms.SqueezeDimD(keys=["image"], dim=0) if pixel_space else lambda x: x,
         ]
     )
 

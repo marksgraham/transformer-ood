@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument(
         "--spatial_dimension", default=3, type=int, help="Dimension of images: 2d or 3d."
     )
+    parser.add_argument("--image_size", default=None, help="Resize images.")
     parser.add_argument(
         "--transformer_type",
         default="transformer",

@@ -16,6 +16,10 @@ def parse_args():
 
     # model params
     parser.add_argument("--vqvae_checkpoint", help="Path to a VQ-VAE model checkpoint.")
+    parser.add_argument(
+        "--spatial_dimension", default=3, type=int, help="Dimension of images: 2d or 3d."
+    )
+    parser.add_argument("--image_size", default=None, help="Resize images.")
     parser.add_argument("--transformer_checkpoint", help="Path to a VQ-VAE model checkpoint.")
     parser.add_argument(
         "--transformer_type",

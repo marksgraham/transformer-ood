@@ -51,6 +51,8 @@ class TransformerTrainer:
 
         # set up data loading and draw a sample
         self.spatial_dimension = args.spatial_dimension
+        self.image_size = int(args.image_size) if args.image_size else args.image_size
+
         self.train_loader, self.val_loader = get_training_data_loader(
             batch_size=args.batch_size,
             training_ids=args.training_dir,
@@ -58,6 +60,8 @@ class TransformerTrainer:
             num_workers=args.num_workers,
             cache_data=bool(args.cache_data),
             spatial_dimension=self.spatial_dimension,
+            image_size=self.image_size,
+            pixel_space=False if args.vqvae_checkpoint else True,
         )
         data_sample = first(self.train_loader)
 
@@ -119,7 +123,7 @@ class TransformerTrainer:
         elif args.transformer_type == "memory-efficient":
 
             self.model = MemoryEfficientTransformer(
-                num_tokens=self.vqvae_model.num_embeddings,
+                num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
                 else math.prod(latent_spatial_shape) + 1,
@@ -320,12 +324,17 @@ class TransformerTrainer:
                         ordering=self.ordering,
                         verbose=False,
                     )
-                    slices = [50, 100, 150]
+                    print(sample.shape)
                     fig = plt.figure()
-                    for i in range(len(slices)):
-                        plt.subplot(1, len(slices), i + 1)
-                        plt.imshow(sample[0, 0, :, :, slices[i]].cpu(), cmap="gray")
-                    plt.show()
+                    if self.spatial_dimension == 3:
+                        slices = [50, 100, 150]
+                        for i in range(len(slices)):
+                            plt.subplot(1, len(slices), i + 1)
+                            plt.imshow(sample[0, 0, :, :, slices[i]].cpu(), cmap="gray")
+                        plt.show()
+                    else:
+                        plt.imshow(sample[0, ...].squeeze().cpu(), cmap="gray")
+
                     self.logger_val.add_figure(
                         tag="samples", figure=fig, global_step=self.global_step
                     )
@@ -346,8 +355,11 @@ class TransformerTrainer:
                 training_ids=ood_dir,
                 validation_ids=ood_dir,
                 num_workers=args.num_workers,
+                num_val_workers=args.num_workers,
                 cache_data=False,
                 only_val=True,
+                spatial_dimension=self.spatial_dimension,
+                image_size=self.image_size,
             )
             progress_bar = tqdm(
                 enumerate(ood_loader),
@@ -366,7 +378,7 @@ class TransformerTrainer:
                     vqvae_model=self.vqvae_model,
                     transformer_model=self.model,
                     ordering=self.ordering,
-                    resample_latent_likelihoods=True,
+                    resample_latent_likelihoods=False,
                     resample_interpolation_mode="nearest",
                     verbose=True,
                 )
@@ -375,6 +387,7 @@ class TransformerTrainer:
                     stem = Path(batch["image_meta_dict"]["filename_or_obj"][b]).stem.replace(
                         ".nii", ""
                     )
+                    # stem = f"{Path(ood_dir).name.split('.')[0]}_{stem}"
                     likelihood = likelihoods[b, ...].sum().item()
                     results_list.append({"filename": stem, "likelihood": likelihood})
                     print(f"\n{stem}: {likelihood}")
