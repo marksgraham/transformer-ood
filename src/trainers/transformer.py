@@ -102,7 +102,7 @@ class TransformerTrainer:
                 num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
-                else math.prod(latent_spatial_shape) + 1,
+                else math.prod(latent_spatial_shape),
                 attn_layers_dim=256,
                 attn_layers_depth=22,
                 attn_layers_heads=8,
@@ -115,7 +115,7 @@ class TransformerTrainer:
                 num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
-                else math.prod(latent_spatial_shape) + 1,
+                else math.prod(latent_spatial_shape),
                 dim=256,
                 depth=22,
                 heads=8,
@@ -127,7 +127,7 @@ class TransformerTrainer:
                 num_tokens=self.vqvae_model.num_embeddings + 1,
                 max_seq_len=int(args.transformer_max_seq_length)
                 if args.transformer_max_seq_length
-                else math.prod(latent_spatial_shape) + 1,
+                else math.prod(latent_spatial_shape),
                 attn_layers_dim=256,
                 attn_layers_depth=22,
                 attn_layers_heads=8,
@@ -253,7 +253,7 @@ class TransformerTrainer:
             prediction, latent, latent_size = self.inferer(
                 inputs=images,
                 vqvae_model=self.vqvae_model,
-                transformer_model=self.model,
+                transformer_model=self.model.module if self.ddp else self.model,
                 ordering=self.ordering,
                 return_latent=True,
             )
@@ -299,7 +299,7 @@ class TransformerTrainer:
                 prediction, latent, latent_spatial_dim = self.inferer(
                     inputs=images,
                     vqvae_model=self.vqvae_model,
-                    transformer_model=self.model,
+                    transformer_model=self.model.module if self.ddp else self.model,
                     ordering=self.ordering,
                     return_latent=True,
                 )
@@ -328,7 +328,9 @@ class TransformerTrainer:
                     print(sample.shape)
                     fig = plt.figure()
                     if self.spatial_dimension == 3:
-                        slices = [50, 100, 150]
+                        max_z = sample.shape[3]
+                        # select spaced 25%, 50%, 75% of the z dimension
+                        slices = [int(max_z * 0.25), int(max_z * 0.5), int(max_z * 0.75)]
                         for i in range(len(slices)):
                             plt.subplot(1, len(slices), i + 1)
                             plt.imshow(sample[0, 0, :, :, slices[i]].cpu(), cmap="gray")
@@ -394,7 +396,9 @@ class TransformerTrainer:
                     likelihood = likelihoods[b, ...].sum().item()
                     results_list.append({"filename": stem, "likelihood": likelihood})
                     print(f"\n{stem}: {likelihood}")
-                    # slices = [50, 100, 150]
+                    # max_z = images.shape[3]
+                    # # select spaced 25%, 50%, 75% of the z dimension
+                    # slices = [int(max_z * 0.25), int(max_z * 0.5), int(max_z * 0.75)]
                     # for i in range(len(slices)):
                     #     plt.subplot(2, len(slices), i + 1)
                     #     plt.imshow(images[b, 0, :, slices[i], :].cpu(), vmin=0, vmax=1, cmap="gray")
@@ -406,6 +410,6 @@ class TransformerTrainer:
                     #     )
                     #
                     #     plt.suptitle(f"\n{stem}: {likelihood}")
-                    plt.show()
+                    # plt.show()
         results_df = pd.DataFrame(results_list)
         results_df.to_csv(self.run_dir / "results.csv")

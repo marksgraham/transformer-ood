@@ -1,4 +1,5 @@
 import argparse
+import ast
 
 from src.trainers import TransformerTrainer
 
@@ -20,6 +21,12 @@ def parse_args():
         "--spatial_dimension", default=3, type=int, help="Dimension of images: 2d or 3d."
     )
     parser.add_argument("--image_size", default=None, help="Resize images.")
+    parser.add_argument(
+        "--image_roi",
+        default=[176, 208, 176],
+        help="Specify central ROI crop of inputs, as a tuple, with -1 to not crop a dimension.",
+        type=ast.literal_eval,
+    )
     parser.add_argument("--transformer_checkpoint", help="Path to a VQ-VAE model checkpoint.")
     parser.add_argument(
         "--transformer_type",
