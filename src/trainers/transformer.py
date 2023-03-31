@@ -61,6 +61,7 @@ class TransformerTrainer:
             cache_data=bool(args.cache_data),
             spatial_dimension=self.spatial_dimension,
             image_size=self.image_size,
+            image_roi=args.image_roi,
             pixel_space=False if args.vqvae_checkpoint else True,
         )
         data_sample = first(self.train_loader)
@@ -360,6 +361,7 @@ class TransformerTrainer:
                 only_val=True,
                 spatial_dimension=self.spatial_dimension,
                 image_size=self.image_size,
+                image_roi=args.image_roi,
             )
             progress_bar = tqdm(
                 enumerate(ood_loader),
@@ -372,6 +374,7 @@ class TransformerTrainer:
             # batch = first(self.val_loader)
             # images = batch['image'].to(self.device)
             for step, batch in progress_bar:
+
                 images = batch["image"].to(self.device)
                 likelihoods = self.inferer.get_likelihood(
                     images,

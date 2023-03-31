@@ -45,7 +45,9 @@ def get_training_data_loader(
     num_val_workers: int = 3,
     cache_data=True,
     spatial_dimension=3,
+    is_grayscale=True,
     image_size=None,
+    image_roi=None,
     pixel_space=False,
 ):
     resize_transform = (
@@ -53,31 +55,28 @@ def get_training_data_loader(
         if image_size
         else lambda x: x
     )
+
+    central_crop_transform = (
+        transforms.CenterSpatialCropD(keys=["image"], roi_size=image_roi)
+        if image_roi
+        else lambda x: x
+    )
+
     train_transforms = transforms.Compose(
         [
             transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]),
+            transforms.EnsureChannelFirstd(keys=["image"]) if is_grayscale else lambda x: x,
+            transforms.Lambdad(keys="image", func=lambda x: x[0, None, ...])
+            if is_grayscale
+            else lambda x: x,  # needed for BRATs data with 4 modalities in 1
+            central_crop_transform,
             resize_transform,
-            transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
-            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
-            if spatial_dimension == 3
-            else lambda x: x,
+            transforms.ScaleIntensityd(keys=["image"], minv=0.0, maxv=1.0),
             transforms.SqueezeDimD(keys=["image"], dim=0) if pixel_space else lambda x: x,
         ]
     )
 
-    val_transforms = transforms.Compose(
-        [
-            transforms.LoadImaged(keys=["image"]),
-            transforms.AddChanneld(keys=["image"]),
-            resize_transform,
-            transforms.ScaleIntensityd(keys=["image"]) if spatial_dimension == 3 else lambda x: x,
-            transforms.CenterSpatialCropd(keys=["image"], roi_size=[176, 208, 176])
-            if spatial_dimension == 3
-            else lambda x: x,
-            transforms.SqueezeDimD(keys=["image"], dim=0) if pixel_space else lambda x: x,
-        ]
-    )
+    val_transforms = train_transforms
 
     val_dicts = get_data_dicts(validation_ids, shuffle=False)
     if cache_data:
