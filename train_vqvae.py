@@ -12,6 +12,13 @@ def parse_args():
     parser.add_argument("--training_dir", help="Location of folder with training niis.")
     parser.add_argument("--validation_dir", help="Location of folder with validation niis.")
 
+    parser.add_argument("--image_size", default=None, help="Resize images.")
+    parser.add_argument(
+        "--image_roi",
+        default=None,
+        help="Specify central ROI crop of inputs, as a tuple, with -1 to not crop a dimension.",
+        type=ast.literal_eval,
+    )
     # model params
     parser.add_argument("--vqvae_in_channels", default=1, type=int)
     parser.add_argument("--vqvae_out_channels", default=1, type=int)

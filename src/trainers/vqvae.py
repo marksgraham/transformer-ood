@@ -48,7 +48,7 @@ class VQVAETrainer:
 
         # set up model
         vqvae_args = {
-            "spatial_dims": args.spatial_dimension,
+            "spatial_dims": 3,
             "in_channels": args.vqvae_in_channels,
             "out_channels": args.vqvae_out_channels,
             "num_res_layers": args.vqvae_num_res_layers,
@@ -143,6 +143,8 @@ class VQVAETrainer:
             validation_ids=args.validation_dir,
             num_workers=args.num_workers,
             cache_data=bool(args.cache_data),
+            image_size=int(args.image_size) if args.image_size else args.image_size,
+            image_roi=args.image_roi,
         )
 
     def save_checkpoint(self, path, epoch, save_message=None):
