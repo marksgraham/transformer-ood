@@ -1,8 +1,8 @@
 # Out-of-distribution detection with Transformers
 
-PyTorch code for the MIDL 2022 paper [Transformer-based out-of-distribution detection for clinically safe segmentation](https://proceedings.mlr.press/v172/graham22a).
+This repo shows how a VQ-GAN + Transformer can be trained to perform unsupervised OOD detection on 3D medical data. It uses the freely available [Medical Decathlon dataset](http://medicaldecathlon.com/) for its experiments.
 
-This repo shows how a VQ-GAN + Transformer can be trained to perform unsupervised OOD detection on 3D medical data, using the [Medical Decathlon dataset](http://medicaldecathlon.com/).
+The method is fully  described in the MIDL 2022 paper [Transformer-based out-of-distribution detection for clinically safe segmentation](https://proceedings.mlr.press/v172/graham22a).
 
 ### Set-up
 Create a fresh environment (this codebase was developed and tested with Python 3.8) and then install the required packages:
